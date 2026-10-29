@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.database import dispose_engine
 from app.core.health import HealthStatus, check_database
-from app.routers import ai_feedback, queue, ws
+from app.routers import ai, ai_feedback, queue, ws
 from app.realtime import broker, manager
 
 
@@ -39,6 +39,7 @@ app.add_middleware(
 app.include_router(queue.router)
 app.include_router(ws.router)
 app.include_router(ai_feedback.router)
+app.include_router(ai.router)
 
 
 @app.get("/", tags=["Meta"])

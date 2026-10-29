@@ -8,8 +8,12 @@ redis
 
 # AI - local classification (Social Studio sentiment + intent, trends)
 transformers
+
+# AI (classifier VM on HuggingFace + local analytics)
+httpx
 scikit-learn
-torch
+pandas
+numpy
 
 # AI - hosted generation (suggested replies, content ideas). Optional: an empty
 # OPENAI_API_KEY runs the app on the local models only, see app/core/config.py.
@@ -18,5 +22,4 @@ openai
 # Testing and linting
 pytest
 pytest-asyncio
-httpx
 pyflakes
