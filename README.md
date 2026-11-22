@@ -139,4 +139,4 @@ LUNA/
 └── frontend_old/           # Legacy React Prototype (For Reference)
 ```
 
-Built by **Team LUNA**.
+Built by **Team LUNA** for the **Hackaholics (Wema Bank)** hackathon.
