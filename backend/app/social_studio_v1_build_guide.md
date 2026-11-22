@@ -1,80 +1,138 @@
-# LUNA SOCIAL STUDIO v1: Architectural Blueprint & Build Prompt
+# LUNA SOCIAL STUDIO: Architectural Blueprint & Build Prompt
+
 **Target:** Antigravity (Development Engine) / Core Engineering Team
 **Project:** LUNA (B2B2C SaaS & Enterprise Platform) - `withluna.tech`
-**Module:** Social Studio (MVP Version 1.0)
+**Module:** Social Studio (V1.0 - Freemium to Enterprise)
 
-## 1. PROJECT CONTEXT & STRATEGY
-LUNA is a multi-tenant B2B2C platform bringing queue management, document verification, and social customer service into a single unified dashboard. 
 
-**The MVP Constraint (Zero-Cost & No App Review):**
-For V1.0, we are completely bypassing official social media App Review processes (Meta, TikTok) and minimizing third-party SaaS API costs. The MVP must serve our first pilot users via strategic technical workarounds. 
 
-**The Future State (Post-MVP):**
-The architecture MUST be strictly provider-agnostic. In the future, we will undergo official App Reviews, generate our own native API keys, and potentially self-host open-source API infrastructures (like Mixpost Pro). The transition from the MVP workarounds to our native API must require **zero rewrites** to the frontend UI or core database logic.
+## 1. PROJECT CONTEXT & OVERARCHING STRATEGY
 
----
+LUNA is a multi-tenant platform operating on a Next.js (Frontend/PWA) and FastAPI (Backend) stack. The Social Studio module brings scheduling, analytics, and a unified inbox to African businesses.
 
-## 2. THE FEATURE-ROUTING MATRIX (MVP EXECUTION)
-Antigravity, you must build the system to route specific features through specific channels:
+To overcome initial capital constraints and Meta/TikTok App Review blockers, this system utilizes a **Zero-Cost MVP Strategy**:
 
-### A. Post Scheduling: The "Reminder Mode" (PWA)
-*   **Method:** We will NOT use APIs to publish posts. LUNA will act as a scheduling/drafting tool. 
-*   **Execution:** The Next.js frontend must be configured as a Progressive Web App (PWA). The FastAPI backend saves drafted posts. At the scheduled time, the backend triggers a Firebase Cloud Messaging (FCM) Web Push Notification to the user's phone. When the user taps "Publish" in the PWA, use the browser's `navigator.clipboard.writeText()` and Web Share API (`navigator.share()`) to pass the media and caption directly to the native Instagram/Facebook/TikTok apps on their OS.
+* **Publishing:** Executed entirely via a Progressive Web App (PWA) "Reminder Mode". Zero API calls are made for publishing to bypass platform restrictions.
 
-### B. DMs & Analytics (Facebook, Instagram, Threads)
-*   **Method:** Meta Developer Sandbox.
-*   **Execution:** We will manually add trial clients as "Testers" in our Meta Developer Portal. The backend must connect to the Meta Graph API using these sandbox tokens. This grants us 100% free, unreviewed access to real-time webhook DMs, comments, and deep analytics.
+* **Inbox & Analytics:** Handled by wrapping the free tiers of four third-party APIs (**SocialAPI.ai, Postproxy, Zernio, and PlanVortex**).
 
-### C. DMs & Analytics (TikTok)
-*   **Method:** Delegated Third-Party API (Zernio).
-*   **Execution:** For high-value prospects, we will route their TikTok connection through Zernio's free tier (2 connected accounts). The backend must use the Zernio API to fetch TikTok DMs and analytics.
+* **Strict HTTP Rule:** You must **strictly use raw HTTP APIs** (`httpx.AsyncClient`) for all third-party integrations. **DO NOT use official vendor SDKs.** This ensures maximum asynchronous performance, prevents vendor data-model bleed, and allows seamless hot-swapping to native Meta/TikTok Graph APIs in the future.
 
----
 
-## 3. BACKEND ARCHITECTURE: FASTAPI (HEXAGONAL PATTERN)
-The backend must use a strict Ports and Adapters (Hexagonal) architecture to ensure we can hot-swap APIs in the future.
+
+## 2. TENANT ROUTING MATRIX & EVOLUTION ROADMAP
+
+The backend must be architected to dynamically route tenants using the Hexagonal (Ports & Adapters) Architecture.
+
+### Phase 1: The Zero-Cost MVP (Current Focus)
+
+We arbitrage free tiers using a strict priority waterfall for onboarding new trial clients:
+
+1. **Priority 1 (SocialAPI.ai):** The first 2 clients are assigned here.
+
+2. **Priority 2 (Postproxy):** The next 2 clients are routed here to maximize its capacity.
+
+3. **Priority 3 (Backup Overflow):** Any additional clients testing the app are routed to Zernio (max 2 accounts per client) and PlanVortex (max 2 accounts per client) to provide up to 4 connected accounts.
+
+
+### Phase 2: The Funded 3rd-Party Scaling
+
+* **Trigger:** Users convert to paid Basic tiers, generating revenue.
+
+* **Action:** Consolidate API routing to paid tiers on the primary utilities (SocialAPI or Postproxy).
+
+* **Engineering:** Zero frontend rewrites. Simply update the `active_social_provider` flag in PostgreSQL for the tenant.
+
+
+### Phase 3: The Independent Native API
+
+* **Trigger:** LUNA passes official Meta and TikTok App Reviews.
+
+* **Action:** Generate native App Secrets. Swap out third-party adapters for `native_meta_adapter.py`.
+
+
+
+## 3. BUSINESS MODEL, TIERS & FEATURE GATING
+
+LUNA operates on a four-tier architecture: **Free**, **Basic**, **Pro**, and **Enterprise**. The MVP relies on a strict freemium model governed by a **Social Credit (SC)** billing engine.
+
+### The Trial & Billing Flow
+
+* **Sign-Up (Free Tier):** Content ideas, post scheduling/calendar, and social analytics are available immediately. The Unified Inbox is strictly **locked**.
+
+*   **The 7-Day Trial:** To unlock the Inbox, the client must enter Credit/Debit Card details upfront or enter a valid promo code. This triggers the free trial on the Basic tier, limited to a maximum of **50 Social Credits (SC)**. More free SC credits can be obtained either by pay-as-you-go, upgrading to paid plan or a 100% discount with a valid promo code.
+
+* **Conversion:** At the end of the 7-day trial, the system auto-bills **₦20,000/month** to lock them into the **Basic** plan.
+
+* **Pay-As-You-Go (PAYG):** If a user depletes their SC balance, they are prompted to purchase additional credit top-ups. (Future AI agents are paywalled behind higher tiers).
+
+
+### The Social Credit (SC) Economy Rules
+
+1. **AI Content Generation:** Every prompt/generation of a content idea **consumes SC**.
+
+2. **Outbound Interactions:** Sending a DM reply or commenting **consumes SC**.
+
+3. **Inbound Fetching (FREE):** Fetching, reading, and ingesting DMs, comments, and Analytics data is **completely free and consumes 0 SC**.
+
+
+
+## 4. BACKEND ARCHITECTURE: FASTAPI (HEXAGONAL PATTERN)
+
+Note: AI models are hosted in a separate, dedicated external environment. This FastAPI service handles routing and business logic only.
 
 ### Directory Structure
-```text
+
+```
 backend/
 ├── app/
-│   ├── a_i/                       # Dedicated directory for HuggingFace/NLP (Suggested replies, sentiment)
-│   ├── core/                      # Global DB, Redis, Auth configs
+│   ├── core/                      # Billing engine, DB sessions, Redis clients
 │   ├── social_studio/
-│   │   ├── router.py              # API Endpoints (FastAPI)
+│   │   ├── router.py              # API Endpoints (e.g., POST /schedule, GET /inbox)
 │   │   ├── interfaces.py          # The Ports (Abstract Base Classes)
-│   │   ├── adapters/              # The Adapters
-│   │   │   ├── meta_sandbox.py    # Meta Graph API logic
-│   │   │   ├── zernio_api.py      # Zernio API logic
-│   │   │   └── reminder_mode.py   # PWA Push Notification trigger logic
-│   │   ├── webhook_parser.py      # Normalizes incoming vendor payloads
-│   │   └── services.py            # Business logic connecting DB and Adapters
+│   │   ├── adapters/              
+│   │   │   ├── socialapi_adapter.py    
+│   │   │   ├── postproxy_adapter.py   
+│   │   │   ├── zernio_adapter.py      
+│   │   │   ├── planvortex_adapter.py      
+│   │   │   └── reminder_mode.py   # PWA push notification scheduler
+│   │   ├── webhook_parser.py      # Normalizes vendor webhooks into LunaMessage schema
+│   │   └── credit_manager.py      # Middleware validating Social Credits (SC)
+
 ```
 
-### Development Directives for Antigravity:
-1.  **Strict Interfaces:** Define `ISocialProvider` in `interfaces.py` with methods like `schedule_post()`, `fetch_analytics()`, and `send_dm_reply()`. All UI requests must talk to this interface, never directly to Meta or Zernio.
-2.  **Dependency Injection:** Use FastAPI's `Depends()` to dynamically resolve the active adapter. Read the tenant's `active_social_provider` from PostgreSQL and inject the correct adapter class into the route.
-3.  **Unified Webhook Ingress:** Build a single `/webhooks` endpoint in `webhook_parser.py`. It must identify if the payload is from Meta or Zernio, parse it into a standard `LunaMessage` Pydantic model, pass it to the `a_i/` module for intent classification/suggested replies, save it to PostgreSQL, and push it to Redis.
-4.  **Real-time WebSockets:** Use Redis Pub/Sub connected to FastAPI WebSockets to push new DMs to the Next.js frontend instantly.
-5.  **Hyperfast Latency:** All adapters MUST use `httpx.AsyncClient` for non-blocking network I/O. Use Redis to cache analytics data heavily. 
+### Engineering Directives:
 
----
+1. **The Interface (Port):** Define `ISocialProvider` in `interfaces.py`. It must mandate methods for `fetch_analytics()`, `send_dm_reply()`, and `get_inbox()`.
 
-## 4. FRONTEND ARCHITECTURE: NEXT.JS (APP ROUTER)
-The frontend must support seamless B2B2C multi-tenancy and the PWA Reminder Mode workflow.
+2. **Credit Validation Middleware:** `credit_manager.py` MUST intercept outbound actions (Replies, AI Generation). If `tenant.social_credits < 1`, return a `402 Payment Required` exception.
 
-### Development Directives for Antigravity:
-1.  **Edge Middleware:** Use Next.js Edge Middleware to inspect Host headers. Dynamically route `wema.withluna.tech` to the B2B2C customer-facing portals, while routing `app.withluna.tech` to the enterprise Staff/Manager dashboards.
-2.  **Feature-Sliced Design:** Do not use generic components/pages folders. Group code by domain (e.g., `features/social-studio/`, `features/queue-management/`). Use a generic `DashboardLayout` that accepts tenant configuration (colors, active modules) from the backend to ensure zero code repetition across subdomains.
-3.  **PWA Configuration:** Implement a `manifest.json` and a Service Worker. Integrate Firebase Cloud Messaging (FCM) to handle incoming background push notifications for the Reminder Mode scheduling handoff.
-4.  **UI Blending:** The desktop UI will act as the "Command Center" (Unified Inbox, live WebSockets, Analytics charts). The mobile PWA UI must elegantly handle the execution phase (displaying the "Publish to OS" buttons when opened via a push notification).
+3. **Dependency Injection (`Depends()`):** Build a resolver that checks the tenant's `active_social_provider` in the DB and injects the correct adapter based on the Priority Routing logic established during their onboarding.
 
----
+4. **Asynchronous Networking:** All adapters must use `httpx.AsyncClient`. Do not use `requests` or official SDKs.
 
-## 5. POST-MVP MIGRATION PATH (THE FUTURE)
-Antigravity, design the codebase knowing that Phase 2 will occur within 6-12 months:
-*   Paid customers will allow us to fully migrate to paid tiers of third-party API platforms
-*   We will pass Meta and TikTok App Reviews.
-*   We will likely deploy Mixpost Pro via Docker.
-*   **Execution:** We will simply write new adapter files (`native_meta_adapter.py`, `mixpost_client.py`), implement the `ISocialProvider` interface, and update the PostgreSQL database's `active_social_provider` string for our tenants. 
-*   **Rule:** The database schema, frontend UI components, and websocket architecture MUST remain entirely untouched during this future migration.
+5. **Webhook Normalization:** `webhook_parser.py` exposes a single endpoint to receive DMs from all 4 providers. It identifies the origin, translates it to a `LunaMessage` model, saves to DB, and pushes to Redis WebSockets.
+
+
+
+## 5. FRONTEND COORDINATION: NEXT.JS (APP ROUTER)
+
+1. **PWA Configuration & Push Notifications:**
+
+   * Include a `manifest.json` and a Service Worker configured with Firebase Cloud Messaging (FCM).
+
+2. **The Reminder Mode Handoff UI:**
+
+   * Clicking the Web Push notification opens a dedicated mobile route displaying the drafted media/caption.
+
+   * Uses `navigator.clipboard.writeText()` and the `navigator.share()` Web Share API to pass the media natively into Instagram/TikTok.
+
+3. **The `usePublishingMode` Feature Toggle:**
+
+   * A global Next.js hook. If `mode === 'REMINDER'`, CTA reads "Schedule Reminder". When LUNA shifts to Phase 3, this updates automatically to "Schedule Post".
+
+4. **Feature Gating UI:**
+
+   * Wrap the Unified Inbox route in a component checking for an active Basic tier/trial. If locked, render the paywall UI.
+
+   * Display the Social Credit balance (e.g., `⚡ 12/50 SC`) persistently in the header.

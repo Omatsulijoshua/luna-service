@@ -1,7 +1,7 @@
 from functools import lru_cache
 from typing import Annotated
 
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
@@ -26,6 +26,13 @@ class Settings(BaseSettings):
     CLERK_PEM_PUBLIC_KEY: str = ""
     CLERK_ISSUER: str = ""
 
+    # --- Authentication (Better-Auth JWT Verification) ---
+    BETTER_AUTH_SECRET: str = (
+        "luna_secret_auth_key_2026_super_secure_multi_tenant"
+    )
+    BETTER_AUTH_ALGORITHM: str = "HS256"
+
+
     # --- AI ---
     # Which AI backend to use. "auto" means: use OpenAI when a key is configured,
     # otherwise fall back to the local HuggingFace models, otherwise degrade to no
@@ -47,7 +54,10 @@ class Settings(BaseSettings):
     # HuggingFace-hosted classifier VM (DistilBERT sentiment + BART intent)
     LUNA_CLASSIFIER_URL: str = ""
 
-    # HuggingFace Inference Providers (OpenAI-compatible) for generation
+    # Modal-hosted unified AI endpoint (sentiment + intent + Qwen completions)
+    LUNA_MODAL_API_URL: str = ""
+
+    # HuggingFace Inference Providers (OpenAI-compatible) or Modal /v1 for generation
     LUNA_MODEL_URL: str = "https://router.huggingface.co/v1"
     LUNA_MODEL_API_KEY: str = ""
     LUNA_MODEL_NAME: str = "Qwen/Qwen2.5-7B-Instruct"
@@ -60,11 +70,44 @@ class Settings(BaseSettings):
     AI_DISTILL_MIN_CONFIDENCE: float = 0.85
     AI_TRAINING_EXPORT_DIR: str = "training_exports"
 
+    # --- Social Studio (Hexagonal Ports & Adapters) ---
+    DEFAULT_SOCIAL_PROVIDER: str = "socialapi"
+    ZERNIO_API_KEY: str = ""
+    ZERNIO_BASE_URL: str = "https://zernio.com/api"
+    SOCIALAPI_AI_KEY: str = ""
+    SOCIALAPI_BASE_URL: str = "https://api.social-api.ai/v1"
+    POSTPROXY_API_KEY: str = ""
+    POSTPROXY_BASE_URL: str = "https://api.postproxy.dev"
+    PLANVORTEX_API_KEY: str = ""
+    PLANVORTEX_BASE_URL: str = "https://api.planvortex.com/v1"
+    FCM_SERVER_KEY: str = ""
+    SOCIAL_CREDITS_TRIAL_DEFAULT: int = 50
+    SOCIAL_PUBLISHING_MODE: str = "REMINDER"
+
+    # --- Payments Engine (PayPal B2B & Paystack B2B2C Split) ---
+    PAYPAL_CLIENT_ID: str = ""
+    PAYPAL_CLIENT_SECRET: str = ""
+    PAYPAL_BASE_URL: str = "https://api-m.sandbox.paypal.com"
+    PAYPAL_WEBHOOK_ID: str = ""
+    PAYPAL_CURRENCY: str = "USD"
+
+    PAYSTACK_SECRET_KEY: str = ""
+    PAYSTACK_PUBLIC_KEY: str = ""
+    PAYSTACK_BASE_URL: str = "https://api.paystack.co"
+    PAYSTACK_WEBHOOK_SECRET: str = ""
+    PAYSTACK_CURRENCY: str = "NGN"
+
+    # Micro-margin deducted by Luna on B2B2C customer bookings
+    LUNA_PLATFORM_MARGIN_PERCENT: float = 1.0  # 1%
+    LUNA_PLATFORM_MARGIN_FIXED_KOBO: int = 10000  # ₦100 fixed platform profit
+
     # NoDecode stops pydantic-settings JSON-parsing the raw string first, which
     # fails on "http://a,http://b" before the validator runs.
     CORS_ORIGINS: Annotated[list[str], NoDecode] = [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
+        "https://withluna.tech",
+        "https://app.withluna.tech",
     ]
 
     @field_validator("CORS_ORIGINS", mode="before")
@@ -73,6 +116,18 @@ class Settings(BaseSettings):
         if isinstance(value, str):
             return [origin.strip() for origin in value.split(",") if origin.strip()]
         return value
+
+    @model_validator(mode="after")
+    def _apply_modal_defaults(self):
+        if self.LUNA_MODAL_API_URL:
+            modal_base = self.LUNA_MODAL_API_URL.rstrip("/")
+            if not self.LUNA_CLASSIFIER_URL:
+                self.LUNA_CLASSIFIER_URL = modal_base
+            if not self.LUNA_MODEL_URL or self.LUNA_MODEL_URL == "https://router.huggingface.co/v1":
+                self.LUNA_MODEL_URL = f"{modal_base}/v1"
+            if not self.LUNA_MODEL_NAME or self.LUNA_MODEL_NAME == "Qwen/Qwen2.5-7B-Instruct":
+                self.LUNA_MODEL_NAME = "Qwen/Qwen2.5-3B-Instruct"
+        return self
 
     @property
     def is_production(self) -> bool:

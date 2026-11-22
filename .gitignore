@@ -1,6 +1,7 @@
 node_modules/
 dist/
 tmp/
+.next/
 
 # Python
 __pycache__/
@@ -17,3 +18,5 @@ htmlcov/
 # Secrets
 .env
 .env.local
+*.sqlite
+*.sqlite3

@@ -5,11 +5,10 @@ asyncpg
 pydantic
 pydantic-settings
 redis
+pyjwt
 
-# AI - local classification (Social Studio sentiment + intent, trends)
+# AI - local classification (Social Studio sentiment + intent, trends) & external clients
 transformers
-
-# AI (classifier VM on HuggingFace + local analytics)
 httpx
 scikit-learn
 pandas

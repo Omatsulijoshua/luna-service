@@ -22,7 +22,7 @@ import uuid
 
 from redis import asyncio as aioredis
 
-from app.realtime.channels import CHANNEL_PATTERN
+from app.realtime.channels import CHANNEL_PATTERN, SOCIAL_CHANNEL_PATTERN
 from app.realtime.manager import ConnectionManager
 
 logger = logging.getLogger(__name__)
@@ -96,10 +96,16 @@ class QueueBroker:
 
     async def _connect(self) -> bool:
         try:
+            ssl_kwargs = {}
+            if self._redis_url.startswith("rediss://"):
+                # Upstash Redis uses TLS; ssl_cert_reqs=None prevents verification failures in minimal container images
+                ssl_kwargs["ssl_cert_reqs"] = None
+
             client = aioredis.from_url(
                 self._redis_url,
                 decode_responses=True,
                 socket_connect_timeout=CONNECT_TIMEOUT_SECONDS,
+                **ssl_kwargs,
             )
             await client.ping()
         except Exception as error:
@@ -155,7 +161,7 @@ class QueueBroker:
         pubsub = self._client.pubsub()
         # Pattern subscribe covers branch and ticket channels with one
         # subscription, so channels can be created without re-subscribing.
-        await pubsub.psubscribe(CHANNEL_PATTERN)
+        await pubsub.psubscribe(CHANNEL_PATTERN, SOCIAL_CHANNEL_PATTERN)
         try:
             async for entry in pubsub.listen():
                 if entry["type"] != "pmessage":
@@ -177,7 +183,7 @@ class QueueBroker:
                     await self._manager.dispatch(entry["channel"], message)
         finally:
             try:
-                await pubsub.punsubscribe(CHANNEL_PATTERN)
+                await pubsub.punsubscribe(CHANNEL_PATTERN, SOCIAL_CHANNEL_PATTERN)
                 close = getattr(pubsub, "aclose", None) or getattr(
                     pubsub, "close", None
                 )
