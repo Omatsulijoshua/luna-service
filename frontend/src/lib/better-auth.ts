@@ -7,9 +7,15 @@ import path from 'node:path';
 const dbPath = path.join(process.cwd(), 'luna-auth.sqlite');
 const db = new DatabaseSync(dbPath);
 
+try {
+  db.exec('PRAGMA journal_mode = WAL;');
+  db.exec('PRAGMA busy_timeout = 5000;');
+} catch {}
+
 // Ensure tables exist on boot
 function ensureSchema() {
-  db.exec(`
+  try {
+    db.exec(`
     CREATE TABLE IF NOT EXISTS "user" (
       id TEXT PRIMARY KEY,
       "name" TEXT NOT NULL,
@@ -96,9 +102,16 @@ function ensureSchema() {
       "crv" TEXT
     );
   `);
+  } catch (err: any) {
+    if (!err?.message?.includes('already exists')) {
+      console.warn('ensureSchema warning:', err?.message);
+    }
+  }
 }
 
-ensureSchema();
+try {
+  ensureSchema();
+} catch {}
 
 export const auth = betterAuth({
   database: db,

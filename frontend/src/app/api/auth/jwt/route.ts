@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { SignJWT } from 'jose';
 import { auth } from '../../../../lib/better-auth';
 
+export const dynamic = 'force-dynamic';
+
 const BETTER_AUTH_SECRET =
   process.env.BETTER_AUTH_SECRET ||
   'luna_secret_auth_key_2026_super_secure_multi_tenant';
