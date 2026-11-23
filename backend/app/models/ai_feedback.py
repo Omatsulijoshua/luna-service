@@ -70,7 +70,7 @@ class AITrainingDataset(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "ai_training_datasets"
 
     kind: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
-    version: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    version: Mapped[str] = mapped_column(String(64), nullable=False)
     sample_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     checksum: Mapped[str] = mapped_column(String(64), nullable=False)
     storage_path: Mapped[str] = mapped_column(String(512), nullable=False)
