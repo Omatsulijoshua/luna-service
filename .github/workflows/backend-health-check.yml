@@ -1,0 +1,28 @@
+name: Backend health check
+
+on:
+  schedule:
+    - cron: "*/20 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-health-check
+  cancel-in-progress: true
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping /health
+        env:
+          HEALTH_URL: https://withluna-backend.onrender.com/health
+        run: |
+          response=$(curl --fail --silent --show-error --location \
+            --max-time 120 --retry 2 --retry-delay 10 --retry-connrefused \
+            "$HEALTH_URL")
+          echo "$response"
+          python3 -c 'import json, sys; data = json.load(sys.stdin); assert data.get("status") == "healthy", f"unexpected status: {data.get(\"status\")}"; assert data.get("checks", {}).get("database") == "ok", f"database unhealthy: {data.get(\"checks\")}"' <<< "$response"
