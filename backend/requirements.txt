@@ -21,4 +21,5 @@ openai
 # Testing and linting
 pytest
 pytest-asyncio
+httpx
 pyflakes

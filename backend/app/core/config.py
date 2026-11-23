@@ -32,7 +32,6 @@ class Settings(BaseSettings):
     )
     BETTER_AUTH_ALGORITHM: str = "HS256"
 
-
     # --- AI ---
     # Which AI backend to use. "auto" means: use OpenAI when a key is configured,
     # otherwise fall back to the local HuggingFace models, otherwise degrade to no
